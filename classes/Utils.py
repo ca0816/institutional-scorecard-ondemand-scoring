@@ -1,7 +1,12 @@
-from datetime import datetime
 import logging
+import os
+from configparser import ConfigParser
+from datetime import datetime
 
 from sqlalchemy.engine import create_engine, Engine
+
+config = ConfigParser()
+config.read(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config.ini'))
 
 
 def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
@@ -11,7 +16,7 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     :param level: Set the root logger level to the specified level.
     :return: logger object
     """
-    logs_path = '/Users/satish.chitturi/CodeBase/Corpository-OnDemand-Scoring-Logs/'
+    logs_path = config.get('Logs', 'logs_path')
     file_name = logs_path + f'on_demand_log_{datetime.now().strftime("%Y%m%d%H%M%S")}.log'
 
     if name.strip() is not None and name.strip() != '' and level in [50, 40, 30, 20, 10, 0]:
@@ -71,12 +76,16 @@ class ConnectionUtils:
         self.info_logger = logging.getLogger('info_logger')
         self.info_logger.setLevel('INFO')
 
-        self.db_username = "yubireaduser"
-        self.db_password = ""
-        self.db_port = 3306
+        self.db_username = config.get('Database.Credentials', 'db_username')
+        self.db_password = config.get('Database.Credentials', 'db_password')
+        self.db_port = config.get('Database.Credentials', 'db_port')
 
-        self.etl_host = "yubi-replica-corpository-etl-data-db.cxnf9ffsrpfk.ap-south-1.rds.amazonaws.com"
-        self.live_host = "yubi-replica-corpository-db.cxnf9ffsrpfk.ap-south-1.rds.amazonaws.com"
+        self.etl_host = config.get('Database.Hosts', 'etl_db_host')
+        self.live_host = config.get('Database.Hosts', 'live_db_host')
+
+        self.crawler_ext_schema = config.get('Database.Schemas', 'crawler_ext_schema')
+        self.etl_data_schema = config.get('Database.Schemas', 'etl_data_schema')
+        self.crawler_output_schema = config.get('Database.Schemas', 'crawler_output_schema')
 
     def get_db_connection(self, connection_name: str) -> Engine:
         """
@@ -90,18 +99,16 @@ class ConnectionUtils:
         if connection_name and connection_name in ['etl_crawler_ext', 'etl_etl_data', 'live_crawler_output']:
             if connection_name + '_connection' not in globals():
                 if connection_name == 'etl_crawler_ext':
-                    etl_crawler_ext_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.etl_host}:{self.db_port}/crawler_ext"
+                    etl_crawler_ext_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.etl_host}:{self.db_port}/{self.crawler_ext_schema}"
                     return create_engine(etl_crawler_ext_connection_url)
                 elif connection_name == 'etl_etl_data':
-                    etl_etl_data_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.etl_host}:{self.db_port}/etl_data"
+                    etl_etl_data_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.etl_host}:{self.db_port}/{self.etl_data_schema}"
                     return create_engine(etl_etl_data_connection_url)
                 elif connection_name == 'live_crawler_output':
-                    live_crawler_output_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.live_host}:{self.db_port}/crawler_output"
+                    live_crawler_output_connection_url = f"mysql://{self.db_username}:{self.db_password}@{self.live_host}:{self.db_port}/{self.crawler_output_schema}"
                     return create_engine(live_crawler_output_connection_url)
             else:
                 return globals()['connection']
         else:
-            self.error_logger.error(f"Invalid connection name: '{connection_name}'. Please check!")
+            get_logger('Utils DB Connection', logging.INFO).error(f"Invalid connection name: '{connection_name}'. Please check!")
             raise ValueError(f"Invalid connection name: '{connection_name}'. Please check!")
-
-
