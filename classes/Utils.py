@@ -22,7 +22,6 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
     if name.strip() is not None and name.strip() != '' and level in [50, 40, 30, 20, 10, 0]:
         logging.basicConfig(
             filename=file_name,
-            level=level,  # Adjust the logging level as needed
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
@@ -33,7 +32,7 @@ def get_logger(name: str, level: int = logging.INFO) -> logging.Logger:
         raise ValueError(f"Invalid logger name or log level. logger name: '{name}', Log level: {level}")
 
 
-def generate_query(table_name: str, select_columns: list, filter_columns: dict, filter_values: dict) -> str:
+def generate_query(table_name: str, select_columns: list, filter_columns: dict = None, filter_values: dict = None) -> str:
     """
     This function generates SQL query and returns the query string.
     :param table_name: nam eof table from where data should be fetched.
@@ -52,29 +51,31 @@ def generate_query(table_name: str, select_columns: list, filter_columns: dict, 
     # Construct the SELECT part of the query
     select_clause = ', '.join(select_columns)
 
-    # Construct the WHERE condition
-    filters = set()
-    for column_name in filter_columns.keys():
-        if filter_columns[column_name].strip() in ['str', 'date']:
-            formatted_vals = [f"'{val}'" for val in filter_values[column_name]]
-            filters.add(f"{column_name} IN ({', '.join(map(str, formatted_vals))})")
-        else:
-            filters.add(f"{column_name} IN ({', '.join(map(str, filter_values[column_name]))})")
+    if filter_columns:
+        # Construct the WHERE condition
+        filters = set()
+        for column_name in filter_columns.keys():
+            if filter_columns[column_name].strip() in ['str', 'date']:
+                formatted_vals = [f"'{val}'" for val in filter_values[column_name]]
+                filters.add(f"{column_name} IN ({', '.join(map(str, formatted_vals))})")
+            else:
+                filters.add(f"{column_name} IN ({', '.join(map(str, filter_values[column_name]))})")
 
-    where_condition = ' AND '.join(map(str, filters))
+        where_condition = ' AND '.join(map(str, filters))
+        # Construct the final query
+        query = f"SELECT {select_clause} FROM {table_name} WHERE {where_condition};"
+    else:
+        query = f"SELECT {select_clause} FROM {table_name};"
 
-    # Construct the final query
-    query = f"SELECT {select_clause} FROM {table_name} WHERE {where_condition};"
-
-    get_logger('Utils-Generate Query', logging.INFO).info(f"Query Generated: '{query}'")
+    get_logger('utils', logging.INFO).info(f"Query Generated: '{query}'")
 
     return query
 
 
-class ConnectionUtils:
+class Utils:
     def __init__(self):
-        self.info_logger = logging.getLogger('info_logger')
-        self.info_logger.setLevel('INFO')
+        self.logger = get_logger('utils', logging.INFO)
+        self.logger.setLevel('INFO')
 
         self.db_username = config.get('Database.Credentials', 'db_username')
         self.db_password = config.get('Database.Credentials', 'db_password')
