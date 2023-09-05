@@ -34,7 +34,7 @@ class AuditorFeatures:
         as_on_dt_fy = f"{self.as_on_date.year - 2}-{self.as_on_date.year - 1}" if self.as_on_date.month <= 3 else f"{self.as_on_date.year - 1}-{self.as_on_date.year}"
 
         self.as_on_dt_fy = as_on_dt_fy
-        self. valid_years = [f'{i}-{i + 1}' for i in range(self.start_year, self.end_year)]
+        self.valid_years = [f'{i}-{i + 1}' for i in range(self.start_year, self.end_year)]
 
     @staticmethod
     def prepare_dummy_records(company_ids: list, min_yr, max_yr):
@@ -210,8 +210,17 @@ class AuditorFeatures:
         auditor_dtls = pd.concat([aoc4_auditor_dtls, aoc4xbrl_auditor_dtls], ignore_index=True)
 
         auditor_dtls['not_qualified'] = auditor_dtls['wthr_qualified'].eq('no')
-        auditor_dtls['auditor_pan'] = auditor_dtls['pan_no'].str.replace('"', '').str.split(',').explode()
-        auditor_dtls = auditor_dtls.dropna(subset=['auditor_pan']).drop(columns=['pan_no'])
+
+        auditor_dtls = auditor_dtls.set_index(['company_master_id', 'financial_year', 't_category', 'wthr_qualified',
+                                               'is_consolidated_standalone_stmt', 'not_qualified']).apply(
+            lambda x: x.str.replace("'", "").str.replace('"', '').str.split(',').explode()
+        ).reset_index()
+
+        auditor_dtls = auditor_dtls[
+            (auditor_dtls['pan_no'].notnull()) & (auditor_dtls['pan_no'] != '')
+        ]
+
+        auditor_dtls = auditor_dtls.rename(columns={'pan_no': 'auditor_pan'})
 
         auditor_dtls = pd.merge(auditor_dtls, auditor_resignation,
                                 on=['financial_year', 'auditor_pan', 'company_master_id'], how='left')
@@ -241,7 +250,8 @@ class AuditorFeatures:
         auditor_dummy_records = self.prepare_dummy_records(self.companies, self.start_year, self.end_year)
         auditor_dtls = pd.merge(auditor_dtls, auditor_dummy_records, on=['company_master_id', 'financial_year'],
                                 how='outer')
-        auditor_dtls['financial_year_start'] = pd.to_numeric(auditor_dtls['financial_year'].str.split('-').str[0], errors='coerce')
+        auditor_dtls['financial_year_start'] = pd.to_numeric(auditor_dtls['financial_year'].str.split('-').str[0],
+                                                             errors='coerce')
 
         auditor_dtls = auditor_dtls[auditor_dtls['financial_year_start'].notnull()]
         self.logger.info(f"dummy_records added in required to auditor_dtls. Number of Rows: {len(auditor_dtls.index)}")
@@ -294,11 +304,12 @@ class AuditorFeatures:
             .agg({'t_fixed_assets': lambda x: set(x.str.lower())}) \
             .reset_index() \
             .assign(fixed_assets_score=lambda df: df['t_fixed_assets'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
+            lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
         )
+                    )
 
-        caro_fixed_assets['financial_year_start'] = pd.to_numeric(caro_fixed_assets['financial_year'].str.split('-').str[0])
+        caro_fixed_assets['financial_year_start'] = pd.to_numeric(
+            caro_fixed_assets['financial_year'].str.split('-').str[0])
         caro_fixed_assets = caro_fixed_assets[caro_fixed_assets['financial_year_start'].notnull()]
         caro_fixed_assets = caro_fixed_assets[
             ['company_master_id', 'financial_year', 'financial_year_start', 'fixed_assets_score']
@@ -312,9 +323,9 @@ class AuditorFeatures:
             .agg({'t_fraud_noticed': lambda x: set(x.str.lower())}) \
             .reset_index() \
             .assign(default_score=lambda df: df['t_fraud_noticed'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
+            lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
         )
+                    )
 
         caro_default['financial_year_start'] = pd.to_numeric(caro_default['financial_year'].str.split('-').str[0])
         caro_default = caro_default[caro_default['financial_year_start'].notnull()]
@@ -330,9 +341,9 @@ class AuditorFeatures:
             .agg({'t_statutory_dues': lambda x: set(x.str.lower())}) \
             .reset_index() \
             .assign(due_score=lambda df: df['t_statutory_dues'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
+            lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
         )
+                    )
 
         statutory_dues['financial_year_start'] = pd.to_numeric(statutory_dues['financial_year'].str.split('-').str[0])
         statutory_dues = statutory_dues[statutory_dues['financial_year_start'].notnull()]
@@ -348,9 +359,9 @@ class AuditorFeatures:
             .agg({'t_accept_public_deposits': lambda x: set(x.str.lower())}) \
             .reset_index() \
             .assign(financial_due_score=lambda df: df['t_accept_public_deposits'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
+            lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
         )
+                    )
 
         financial_dues['financial_year_start'] = pd.to_numeric(financial_dues['financial_year'].str.split('-').str[0])
         financial_dues = financial_dues[financial_dues['financial_year_start'].notnull()]
@@ -358,17 +369,16 @@ class AuditorFeatures:
             ['company_master_id', 'financial_year', 'financial_year_start', 'financial_due_score']
         ]
 
-        financial_due_score = self.build_agg_features(financial_dues, 'financial_due_score', 'financial_due_score', 'mean')
+        financial_due_score = self.build_agg_features(financial_dues, 'financial_due_score', 'financial_due_score',
+                                                      'mean')
 
         self.logger.info(f"extraction of 'financial_due_score' features completed.")
         ################################################################################################################
         term_loan_dues = caro_standalone.groupby(['company_master_id', 'financial_year']) \
-            .agg({'t_term_loans': lambda x: set(x.str.lower())}) \
-            .reset_index() \
-            .assign(term_loans_score=lambda df: df['t_term_loans'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
-        )
+            .agg({'t_term_loans': lambda x: set(x.str.lower())}).reset_index().assign(
+            term_loans_score=lambda df: df['t_term_loans'].apply(
+                lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
+            ))
 
         term_loan_dues['financial_year_start'] = pd.to_numeric(term_loan_dues['financial_year'].str.split('-').str[0])
         term_loan_dues = term_loan_dues[term_loan_dues['financial_year_start'].notnull()]
@@ -384,11 +394,12 @@ class AuditorFeatures:
             .agg({'t_inventories': lambda x: set(x.str.lower())}) \
             .reset_index() \
             .assign(inventories_score=lambda df: df['t_inventories'].apply(
-             lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
-            )
+            lambda s: 0 if 'unfavourable' in s or 'disclaimer' in s else (1 if 'favourable' in s else 0.5)
         )
+                    )
 
-        caro_inventories['financial_year_start'] = pd.to_numeric(caro_inventories['financial_year'].str.split('-').str[0])
+        caro_inventories['financial_year_start'] = pd.to_numeric(
+            caro_inventories['financial_year'].str.split('-').str[0])
         caro_inventories = caro_inventories[term_loan_dues['financial_year_start'].notnull()]
         caro_inventories = caro_inventories[
             ['company_master_id', 'financial_year', 'financial_year_start', 'inventories_score']
@@ -400,12 +411,15 @@ class AuditorFeatures:
         ################################################################################################################
 
         final_score = pd.merge(f_asset_score, fraud_score, on=['financial_year', 'company_master_id'], how='outer')
-        final_score = pd.merge(statutory_due_score, final_score, on=['financial_year', 'company_master_id'], how='outer')
-        final_score = pd.merge(financial_due_score, final_score, on=['financial_year', 'company_master_id'], how='outer')
+        final_score = pd.merge(statutory_due_score, final_score, on=['financial_year', 'company_master_id'],
+                               how='outer')
+        final_score = pd.merge(financial_due_score, final_score, on=['financial_year', 'company_master_id'],
+                               how='outer')
         final_score = pd.merge(term_loan_score, final_score, on=['financial_year', 'company_master_id'], how='outer')
         final_score = pd.merge(inventory_score, final_score, on=['financial_year', 'company_master_id'], how='outer')
 
-        final_score = pd.merge(final_score, audit_score, on=['company_master_id', 'financial_year'], 
-                               how='outer').drop_duplicates()
+        final_score = pd.merge(final_score, audit_score, on=['company_master_id', 'financial_year'],
+                               how='outer').drop_duplicates().drop(columns=['financial_year'])
+
         self.logger.info("Extracting Auditors Features Completed.")
         return final_score

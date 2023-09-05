@@ -72,6 +72,28 @@ def generate_query(table_name: str, select_columns: list, filter_columns: dict =
     return query
 
 
+def get_indian_financial_year(date):
+    year = date.year
+    if date.month >= 4:  # If the date is in April or later
+        start_date = datetime(year, 4, 1).date()
+        end_date = datetime(year + 1, 3, 31).date()
+    else:  # If the date is before April
+        start_date = datetime(year - 1, 4, 1).date()
+        end_date = datetime(year, 3, 31).date()
+    return start_date, end_date
+
+
+def get_previous_indian_financial_year(date):
+    year = date.year - 1
+    if date.month >= 4:  # If the date is in April or later
+        start_date = datetime(year, 4, 1).date()
+        end_date = datetime(year + 1, 3, 31).date()
+    else:  # If the date is before April
+        start_date = datetime(year - 1, 4, 1).date()
+        end_date = datetime(year, 3, 31).date()
+    return start_date, end_date
+
+
 class Utils:
     def __init__(self):
         self.logger = get_logger('utils', logging.INFO)
