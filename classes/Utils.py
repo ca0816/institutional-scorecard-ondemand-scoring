@@ -116,6 +116,8 @@ class Utils:
         function returns the same. Connection for 'ETL DB - crawler_ext', 'ETL DB - etl_data',  'Live DB - crawler_output'
         schema's can be created.
 
+        Value Should be out of these 3 values: ['etl_crawler_ext', 'etl_etl_data', 'live_crawler_output']
+
         :param connection_name: name of the connection that is used to create connection to required schema.
         :return: Engine
         """
