@@ -10,18 +10,47 @@
 #
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import pandas as pd
 
 from classes import Utils, get_logger, generate_query
-from classes.Utils import get_indian_financial_year
 
 utils = Utils()
 
-# Logger variables to be used for logging
-info_logger = logging.getLogger('info_logger')
-error_logger = logging.getLogger('error_logger')
+final_features_features = [
+    'company_master_id', 'financial_year', 'financial_year_start',
+
+    'total_debt_by_pat', 'current_ratio', 'quick_ratio', 'pat', 'ebitda', 'ebitda_by_sales',
+
+    'inventory_days_diff_1_yrs', 'inventory_days_diff_2_yrs', 'inventory_days_diff_3_yrs', 'inventory_days_diff_4_yrs',
+
+    'receivables_days_diff_1_yrs', 'receivables_days_diff_2_yrs', 'receivables_days_diff_3_yrs',
+    'receivables_days_diff_4_yrs',
+
+    'networth_diff_perc_1_yrs', 'networth_diff_perc_2_yrs', 'networth_diff_perc_3_yrs', 'networth_diff_perc_4_yrs',
+
+    'pat_diff_perc_1_yrs', 'pat_diff_perc_2_yrs', 'pat_diff_perc_3_yrs', 'pat_diff_perc_4_yrs',
+
+    'ebitda_by_sales_diff_1_yrs', 'ebitda_by_sales_diff_2_yrs', 'ebitda_by_sales_diff_3_yrs',
+    'ebitda_by_sales_diff_4_yrs',
+
+    'working_capital_by_asset', 'short_term_debt_by_cash_eqv', 'short_term_debt_by_networth', 'roa', 'roe',
+    'working_capital_turnover_ratio',
+
+    'tot_fixed_asset_diff_perc_1_yrs', 'tot_fixed_asset_diff_perc_2_yrs', 'tot_fixed_asset_diff_perc_3_yrs',
+    'tot_fixed_asset_diff_perc_4_yrs',
+
+    'roa_diff_1_yrs', 'roa_diff_2_yrs', 'roa_diff_3_yrs', 'roa_diff_4_yrs', 'roe_diff_1_yrs', 'roe_diff_2_yrs',
+    'roe_diff_3_yrs', 'roe_diff_4_yrs', 'total_revenue_diff_perc_1_yrs', 'total_revenue_diff_perc_2_yrs',
+    'total_revenue_diff_perc_3_yrs', 'total_revenue_diff_perc_4_yrs',
+
+    'revenue_from_operations_diff_perc_1_yrs', 'revenue_from_operations_diff_perc_2_yrs',
+    'revenue_from_operations_diff_perc_3_yrs', 'revenue_from_operations_diff_perc_4_yrs',
+    'growth_in_operating_income', 'operating_income', 'roce', 'debt_by_gross_accrual', 'ltborrowing_by_gross_accrual',
+    'ltborrowing_by_ebitda', 'debt_by_ebitda', 'creditor_period', 'working_capital_cycle', 'ebidta_margins_per',
+    'pat_margins_per', 'inventory_days', 'receivables_days'
+]
 
 
 class EfFinancialFeatures:
@@ -31,7 +60,7 @@ class EfFinancialFeatures:
         :param companies_list: list of companies to extract features
         :param as_on_date: A date on which features should be extracted for the given set of companies.
         """
-        self.logger = get_logger('AuditorLogger', logging.INFO)
+        self.logger = get_logger('EfFinancialsLogger', logging.INFO)
         self.companies = companies_list
         self.as_on_date = as_on_date
         self.end_year = self.as_on_date.year - 1 if self.as_on_date.month <= 3 else self.as_on_date.year
@@ -41,41 +70,7 @@ class EfFinancialFeatures:
         self.as_on_dt_fy = as_on_dt_fy
         self.valid_years = [f'{i}-{i + 1}' for i in range(self.start_year, self.end_year)]
 
-        self.features = [
-            'total_debt_by_pat', 'current_ratio', 'quick_ratio', 'pat', 'ebitda', 'ebitda_by_sales',
-
-            'inventory_days_diff_1_yrs', 'inventory_days_diff_2_yrs', 'inventory_days_diff_3_yrs',
-            'inventory_days_diff_4_yrs',
-
-            'receivables_days_diff_1_yrs', 'receivables_days_diff_2_yrs', 'receivables_days_diff_3_yrs',
-            'receivables_days_diff_4_yrs',
-
-            'networth_diff_perc_1_yrs', 'networth_diff_perc_2_yrs', 'networth_diff_perc_3_yrs',
-            'networth_diff_perc_4_yrs',
-
-            'pat_diff_perc_1_yrs', 'pat_diff_perc_2_yrs', 'pat_diff_perc_3_yrs', 'pat_diff_perc_4_yrs',
-
-            'ebitda_by_sales_diff_1_yrs', 'ebitda_by_sales_diff_2_yrs', 'ebitda_by_sales_diff_3_yrs',
-            'ebitda_by_sales_diff_4_yrs',
-
-            'working_capital_by_asset', 'short_term_debt_by_cash_eqv', 'short_term_debt_by_networth', 'roa', 'roe',
-            'working_capital_turnover_ratio',
-
-            'tot_fixed_asset_diff_perc_1_yrs', 'tot_fixed_asset_diff_perc_2_yrs', 'tot_fixed_asset_diff_perc_3_yrs',
-            'tot_fixed_asset_diff_perc_4_yrs',
-
-            'roa_diff_1_yrs', 'roa_diff_2_yrs', 'roa_diff_3_yrs', 'roa_diff_4_yrs', 'roe_diff_1_yrs', 'roe_diff_2_yrs',
-            'roe_diff_3_yrs', 'roe_diff_4_yrs', 'total_revenue_diff_perc_1_yrs', 'total_revenue_diff_perc_2_yrs',
-            'total_revenue_diff_perc_3_yrs', 'total_revenue_diff_perc_4_yrs',
-
-            'revenue_from_operations_diff_perc_1_yrs', 'revenue_from_operations_diff_perc_2_yrs',
-            'revenue_from_operations_diff_perc_3_yrs', 'revenue_from_operations_diff_perc_4_yrs',
-            'growth_in_operating_income', 'operating_income', 'roce', 'debt_by_gross_accrual',
-            'ltborrowing_by_gross_accrual', 'ltborrowing_by_ebitda', 'debt_by_ebitda', 'creditor_period',
-            'working_capital_cycle', 'ebidta_margins_per', 'pat_margins_per', 'inventory_days', 'receivables_days'
-        ]
-
-    def extract_financial(self, bs: pd.DataFrame, pnl: pd.DataFrame = None, financial_ratio: pd.DataFrame = None):
+    def extract_financial(self, bs: pd.DataFrame, pnl: pd.DataFrame, financial_ratio: pd.DataFrame):
         """
         Function to extract Financial features for Enterprise Companies.
         :param bs: dataframe with Accord MCA Balance Sheet data
@@ -83,7 +78,7 @@ class EfFinancialFeatures:
         :param financial_ratio: dataframe with Accord MCA Financial Ratios data
         :return: DataFrame
         """
-        self.logger.info('started extracting ef financials')
+        self.logger.info('Started extracting financials for EF Companies')
 
         bs['is_consolidated_standalone_stmt'] = bs['is_consolidated_standalone_stmt'].str.lower().str.strip()
 
@@ -248,15 +243,14 @@ class EfFinancialFeatures:
         ################################################################################################################
         bs_pnl_ratios = bs_pnl_ratios[
             bs_pnl_ratios['financial_year'] == self.as_on_dt_fy
-        ]
-        bs_pnl_ratios = bs_pnl_ratios[
-            [*(['company_master_id', 'financial_year', 'financial_year_start'] + self.features)]]
+            ]
+        bs_pnl_ratios = bs_pnl_ratios[final_features_features]
 
-        self.logger.info('Completed extracting ef companies financial features')
+        self.logger.info('Completed extracting financials for EF Companies')
         return bs_pnl_ratios
 
     def get_ef_financials(self):
-        self.logger.info("Started Extracting Auditors Features.")
+        self.logger.info('Started fetching data to calculate financials for EF Companies')
         etl_etl_data_connection = utils.get_db_connection(connection_name='etl_etl_data')
 
         bs_cols = ['company_master_id', 'financial_year', 'is_consolidated_standalone_stmt', 'tot_curr_assets_curr',
@@ -303,5 +297,6 @@ class EfFinancialFeatures:
         )
 
         accord_mca_financial_ratio = pd.read_sql(accord_mca_financial_ratio_query, etl_etl_data_connection)
+        self.logger.info('Completed fetching data to calculate financials for EF Companies')
 
         return self.extract_financial(accord_mca_balance_sheet, accord_mca_profit_loss, accord_mca_financial_ratio)
