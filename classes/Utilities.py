@@ -3,6 +3,9 @@ import os
 from configparser import ConfigParser
 from datetime import datetime
 
+from dateutil.relativedelta import relativedelta
+
+import pandas as pd
 from sqlalchemy.engine import create_engine, Engine
 
 config = ConfigParser()
@@ -72,7 +75,13 @@ def generate_query(table_name: str, select_columns: list, filter_columns: dict =
     return query
 
 
-def get_indian_financial_year(date):
+def get_indian_financial_year(date: datetime.date) -> (datetime.date, datetime.date):
+    """
+    Function to generate financial year for any given date.
+    Indian financial year starts from 1st April to next year's March 31
+    :param date: date for which you need to calculate Financial Year
+    :return: a tuple of financial year start date and end date
+    """
     year = date.year
     if date.month >= 4:  # If the date is in April or later
         start_date = datetime(year, 4, 1).date()
@@ -83,15 +92,47 @@ def get_indian_financial_year(date):
     return start_date, end_date
 
 
-def get_previous_indian_financial_year(date):
-    year = date.year - 1
-    if date.month >= 4:  # If the date is in April or later
-        start_date = datetime(year, 4, 1).date()
-        end_date = datetime(year + 1, 3, 31).date()
-    else:  # If the date is before April
-        start_date = datetime(year - 1, 4, 1).date()
-        end_date = datetime(year, 3, 31).date()
+def get_previous_indian_financial_year(date: datetime.date, n: int):
+    """
+        Function to generate financial year for any given date.
+        Indian financial year starts from 1st April to next year's March 31
+        :param date: date for which you need to calculate previous Financial Year
+        :param n: nth previous financial year that you need to calculate.
+        :return: a tuple of financial year start date and end date
+        """
+    if n >= 0:
+        start_date, end_date = get_indian_financial_year(date)
+        start_date = start_date + relativedelta(years=-1*n)
+        end_date = end_date + relativedelta(years=-1*n)
+        return start_date, end_date
+    else:
+        raise ValueError("'n' should be a non negative integer.")
+
+
+def get_quarter(date):
+    date = pd.to_datetime(date)
+    start_date = pd.to_datetime(date.to_period('Q').start_time.date()).date()
+    end_date = pd.to_datetime(date.to_period('Q').end_time.date()).date()
     return start_date, end_date
+
+
+def get_previous_quarter(date: datetime.date, n: int):
+    """
+        Function to generate financial year for any given date.
+        Indian financial year starts from 1st April to next year's March 31
+        :param date: date for which you need to calculate previous Financial Year
+        :param n: nth previous financial year that you need to calculate.
+        :return: a tuple of financial year start date and end date
+        """
+    if n >= 0:
+        date = pd.to_datetime(date)
+        start_date = pd.to_datetime(date.to_period('Q').start_time.date()).date() + relativedelta(months=-3*n)
+        end_date = pd.to_datetime(date.to_period('Q').end_time.date()).date() + relativedelta(months=-3*n)
+        return start_date, end_date
+    else:
+        raise ValueError("'n' should be a non negative integer.")
+
+
 
 
 class Utils:
